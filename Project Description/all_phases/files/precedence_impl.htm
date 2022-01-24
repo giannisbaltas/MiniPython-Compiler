@@ -1,0 +1,28 @@
+<html>
+<head>
+	<title>Υλοποίηση Προτεραιότητας Τελεστών</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=windows-1253">
+</head>
+<body>
+
+<font face="Arial">
+	
+<h1>Υλοποίηση προτεραιότηας τελεστών</h1>
+<p>Ακολουθεί ένα πρακτικό παράδειγμα για την εφαρμογή της προτεραιότητας των τελεστών σε ένα αρχείο γραμματικής για το SableCC. Πρόκειται για την απόδοση υψηλότερης προτεραιότητας στον πολλαπλασιαμό έναντι της πρόσθεσης. Υλοποιείται ακόμα η από τα αριστερά προς τα δεξιά προσεταριστικότητα των πράξεων.</p>
+
+<p>Μια γενική τακτική, είναι να υπάρχει ένα επίπεδο κανόνα.</p>
+<pre>  
+ multiplication = {something} something 
+   		| {multiplication} multiplication times something
+ 		;
+   
+ addition = 
+  	{multiplication} multiplication |
+	{addition} addition plus multiplication|
+ 	{subtraction} addition minus multiplication;
+</pre>
+
+</font>
+
+</body>
+</html>

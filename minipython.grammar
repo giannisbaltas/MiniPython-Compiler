@@ -1,0 +1,270 @@
+/*
+    Πέτρος Παπαθεοδώρου - p3170133
+    Ιωάννης Χρίστος Μπαλτάς - p3180113
+    Ευθύμης Ευθυμιάδης - p3180054
+*/
+
+Package minipython; 
+
+Helpers
+    digit = ['0' .. '9'];
+    letter = ['a' .. 'z'] | ['A' .. 'Z'];
+	all = [0..127];
+	// ascii codes (unprintable) 
+    cr = 13;
+    lf = 10;
+	// for multiplatform coverage
+    eol = lf | cr | cr lf;
+    not_eol = [all - [cr + lf]];
+
+Tokens 
+    tab = 9;
+    assign = '=';
+    plus = '+';
+    minus = '-';
+    mult = '*';
+    dmult = '**';
+    div = '/';
+    mod = '%';
+    geq = '>=';
+    leq = '<=';
+    eq = '==';
+    neq = '!=';
+    less = '<';
+    great = '>';
+    sub_assign = '-=';
+    div_assign = '/=';
+    l_par = '(';
+    r_par = ')';
+    l_br = '[';
+    r_br = ']';
+    dot = '.';
+    comma = ',';
+    quote = '"';
+    single_quote = ''';
+    semi = ':';
+    import = 'import';
+    as = 'as';
+    from = 'from';
+    true = 'true';
+    false = 'false';
+    def = 'def';
+    if = 'if';
+    elif = 'elif';
+    else = 'else';
+    while = 'while';
+    for = 'for';
+    in = 'in';
+    assert = 'assert';
+    print = 'print';
+    return = 'return';
+    none = 'None';
+    max = 'max';
+    min = 'min';
+    len = 'len';
+    and = 'and';
+    or = 'or';
+    not = 'not';
+    blank = (' ' | lf | cr);
+    line_comment = '#' not_eol * eol;
+    number = digit+ | (digit+ '.' digit+);
+    identifier = letter (letter | digit)*;
+    string = '"'not_eol* '"';
+    single_string = '''not_eol* ''';
+
+Ignored Tokens
+    blank, line_comment;
+
+Productions
+    goal = command* {-> New goal([command])};
+
+    command = {func} function {-> New command.func(function)} | 
+              {stat} statement {-> New command.stat(statement)};
+
+    function = def identifier l_par argument? r_par semi statement {-> New function(identifier, [argument], statement)};
+    
+    argument = identifier_def_val another_val* {-> New argument(identifier_def_val,[another_val])};
+    
+    identifier_def_val = identifier assign_val?{-> New identifier_def_val(identifier, [assign_val]) };
+    
+    assign_val = assign value{-> New assign_val(value)};
+
+    another_val = comma identifier_def_val?{-> New another_val([identifier_def_val])};
+
+    statement = {if}tab* if comparison semi statement {-> New statement.if(comparison, statement)} |                
+                {while}tab* while comparison semi statement  {-> New statement.while(comparison, statement)} |                
+                {for}tab* for [id1]: identifier in [id2]: identifier semi statement  {-> New statement.for(id1, id2, statement)} |               
+                {return}tab* return expression {-> New statement.return(expression)} |                
+                {print}tab* print expression comma_expression* {-> New statement.print(expression, [comma_expression])} |                
+                {assignment}tab* assignment_statement {-> assignment_statement.statement} |                
+                {assert}tab* assert expression comma_expression? {-> New statement.assert(expression, [comma_expression])} |  
+			    {import}tab* import_statement {-> New statement.import(import_statement)} |
+                {func_call}tab* function_call {-> New statement.func_call(function_call)};
+
+	// assignements involving '=' symbol. '+=' and '*=' not included, since they didn't exist in the bnf
+    assignment_statement{->statement} = {assign} identifier assign expression {-> New statement.assign(identifier,expression)} |
+                {sub_assign} identifier sub_assign expression {-> New statement.sub_assign(identifier,expression)} |
+                {div_assign} identifier div_assign expression {-> New statement.div_assign(identifier,expression)} |
+                {assign_arr} identifier l_br [exp1]: expression r_br assign [exp2]: expression {-> New statement.assign_arr(identifier,exp1,exp2)};
+
+    expression = {numerical_exp} num_exp {-> num_exp.expression};
+
+    num_exp{->expression} = {sum} num_exp plus first_group  {-> New expression.arithmetic(num_exp.expression, New binary_operators.plus(plus), first_group.expression)} |
+                {minus} num_exp minus first_group {-> New expression.arithmetic(num_exp.expression, New binary_operators.minus(minus), first_group.expression)} |
+                {first_group} first_group {-> first_group.expression};
+
+    first_group{->expression} = {mult} first_group mult sec_group {-> New expression.arithmetic(first_group.expression, New binary_operators.mult(mult), sec_group.expression)} |
+                {div} first_group div sec_group {-> New expression.arithmetic(first_group.expression, New binary_operators.div(div), sec_group.expression)} |
+                {mod} first_group mod sec_group {-> New expression.arithmetic(first_group.expression, New binary_operators.mod(mod), sec_group.expression)} |
+                {sec_group} sec_group {-> sec_group.expression};
+
+    sec_group{->expression} = {third_group} third_group {-> third_group.expression} | 
+                {exp} sec_group dmult third_group {-> New expression.arithmetic(sec_group.expression, New binary_operators.exp(dmult), third_group.expression)};
+    
+    third_group{->expression} = {id_bracket_exp} identifier l_br expression r_br  {-> New expression.id_bracket_exp(identifier, expression)} |
+                {func_call} function_call {->New expression.func_call(function_call)} |
+                {len_exp} len l_par expression r_par {-> New expression.len_exp(expression)} |
+                {max} max l_par value comma_value+ r_par {-> New expression.max(value, [comma_value])} |
+                {min} min l_par value comma_value+ r_par {-> New expression.min(value, [comma_value])} |
+                {par} l_par num_exp r_par {->New expression.par(num_exp.expression)} |
+                {value} value {->New expression.value(value)} |
+                {identifier} identifier {-> New expression.identifier(identifier)} |
+                {list_def} l_br expression comma_expression* r_br {-> New expression.list_def(expression, [comma_expression])};
+    
+    comma_value = comma value {->New comma_value(value)};
+
+	//except normal imports, covering cases like relative imports and imports with aliases
+    import_statement = {import_module_as} import module import_as? another_module* {-> New import_statement.import_module_as(module, [import_as], [another_module])} |
+                {from_module_import} from module import identifier import_as? another_identifier* {-> New import_statement.from_module_import(module, identifier, [import_as], [another_identifier])};
+    
+    module = id_dot* identifier {-> New module([id_dot],identifier)};
+
+    import_as = as identifier {-> New import_as(identifier)};
+
+    id_dot = identifier dot {-> New id_dot(identifier)};
+
+	another_module = comma module import_as? {-> New another_module(module,[import_as])};
+
+	another_identifier = comma identifier import_as? {-> New another_identifier(identifier,[import_as])};
+
+    // covering both 'and', 'or' and numerical comparissons
+    comparison = case1 {-> case1.comparison};
+
+    case1{-> comparison} = {or} case1 or case2  {-> New comparison.or(case1.comparison, case2.comparison)}|
+            {and} case2 {-> case2.comparison};
+
+    case2{-> comparison} = {and} case2 and case3 {-> New comparison.and(case2.comparison, case3.comparison)} | 
+            {not} case3 {-> case3.comparison};
+
+    case3{-> comparison} = {case3} not comp {-> New comparison.not(comp.comparison)} | 
+            {comp} comp {-> comp.comparison};
+
+    comp{-> comparison} = {great} [exp1]: expression great [exp2]: expression {-> New comparison.great(exp1,exp2)} |
+                {less} [exp1]: expression less [exp2]: expression {-> New comparison.less(exp1,exp2)} |
+                {leq} [exp1]: expression leq [exp2]: expression {-> New comparison.leq(exp1,exp2)} |
+	            {geq} [exp1]: expression geq [exp2]: expression {-> New comparison.geq(exp1,exp2)} |
+	            {neq} [exp1]: expression neq [exp2]: expression {-> New comparison.neq(exp1,exp2)} |
+	            {eq} [exp1]: expression eq [exp2]: expression {-> New comparison.eq(exp1,exp2)} |
+	            {true} true  {-> New comparison.true()}|
+                {false} false  {-> New comparison.false()};
+
+    //calls for functions with arguments or void functions
+    function_call = identifier l_par arglist? r_par {-> New function_call(identifier, [arglist])};
+
+    arglist = expression comma_expression*  {->New arglist(expression,[comma_expression])};
+
+	// any assignable value 
+    value = {id_func} identifier dot function_call  {-> New value.id_func(identifier, function_call)}|
+            {num} number {-> New value.num(number)}|
+            {string} string  {->New value.string(string)}|
+            {single_string} single_string {->New value.single_string(single_string)}|
+            {none} none  {->New value.none(none)};
+            
+    comma_expression = comma expression  {->New comma_expression(expression)};
+    
+Abstract Syntax Tree
+
+    goal = command*;
+
+    command = {func} function | {stat} statement;
+
+    function = identifier argument* statement;
+    
+    argument = identifier_def_val another_val*;
+    
+    identifier_def_val = identifier assign_val*;
+    
+    assign_val = value;
+
+    another_val = identifier_def_val*; 
+
+    statement = {if}comparison statement |                
+                {while}comparison statement |                
+                {for}[id1]: identifier [id2]: identifier statement |               
+                {return}expression |                
+                {print}expression comma_expression* |                
+                {assign}identifier expression |  
+                {sub_assign} identifier expression | 
+                {div_assign} identifier expression |
+                {assign_arr} identifier [exp1]: expression [exp2]: expression |           
+                {assert} expression comma_expression* |  
+			    {import}import_statement |
+                {func_call} function_call;
+
+    expression = {arithmetic} [exp1]:expression binary_operators [exp2]:expression |
+                 {id_bracket_exp} identifier expression |
+                 {func_call} function_call |
+                 {identifier} identifier |
+                 {value} value |
+                 {len_exp} expression |
+                 {max} value comma_value* |
+                 {min} value comma_value* |
+                 {par} expression |
+                 {list_def} expression comma_expression*;
+
+    binary_operators = {plus} plus |
+                       {minus} minus |
+                       {mult} mult |
+                       {div} div |
+                       {mod} mod |
+                       {exp} dmult;    
+
+    comma_value = value;
+
+    import_statement = {import_module_as} module import_as* another_module* |
+                       {from_module_import} module identifier import_as* another_identifier*;
+    
+    module = id_dot* identifier;
+
+    import_as = identifier;
+
+    id_dot = identifier;
+
+	another_module = module import_as*;
+
+	another_identifier = identifier import_as*;
+
+    comparison = {and} [comp1]:comparison [comp2]:comparison |
+                 {or} [comp1]:comparison [comp2]:comparison |
+                 {not} comparison |
+                 {great} [exp1]: expression [exp2]: expression |
+                 {less} [exp1]: expression [exp2]: expression |
+                 {leq} [exp1]: expression [exp2]: expression |
+	             {geq} [exp1]: expression [exp2]: expression |
+	             {neq} [exp1]: expression [exp2]: expression |
+	             {eq} [exp1]: expression [exp2]: expression |
+	             {true} |
+                 {false};
+
+    function_call = identifier arglist*;
+	
+	arglist = expression comma_expression*;
+
+	comma_expression = expression;
+
+    value = {id_func} identifier function_call |
+            {num} number |
+            {string} string |
+            {single_string} single_string|
+            {none} none;
+            

@@ -1,0 +1,6 @@
+*.class
+minipython/
+
+.idea
+*.iml
+out/

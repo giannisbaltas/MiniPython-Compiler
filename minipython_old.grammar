@@ -1,0 +1,171 @@
+/*
+    Πέτρος Παπαθεοδώρου - p3170133
+    Ιωάννης Χρίστος Μπαλτάς - p3180113
+    Ευθύμης Ευθυμιάδης - p3180054
+*/
+
+Package minipython_old; 
+
+Helpers
+    digit = ['0' .. '9'];
+    letter = ['a' .. 'z'] | ['A' .. 'Z'];
+	all = [0..127];
+	// ascii codes (unprintable) 
+    cr = 13;
+    lf = 10;
+	// for multiplatform coverage
+    eol = lf | cr | cr lf;
+    not_eol = [all - [cr + lf]];
+
+Tokens 
+    tab = 9;
+    assign = '=';
+    plus = '+';
+    minus = '-';
+    mult = '*';
+    dmult = '**';
+    div = '/';
+    mod = '%';
+    geq = '>=';
+    leq = '<=';
+    eq = '==';
+    neq = '!=';
+    less = '<';
+    great = '>';
+    sub_assign = '-=';
+    div_assign = '/=';
+    l_par = '(';
+    r_par = ')';
+    l_br = '[';
+    r_br = ']';
+    dot = '.';
+    comma = ',';
+    quote = '"';
+    single_quote = ''';
+    semi = ':';
+    import = 'import';
+    as = 'as';
+    from = 'from';
+    true = 'true';
+    false = 'false';
+    def = 'def';
+    if = 'if';
+    elif = 'elif';
+    else = 'else';
+    while = 'while';
+    for = 'for';
+    in = 'in';
+    assert = 'assert';
+    print = 'print';
+    return = 'return';
+    none = 'None';
+    max = 'max';
+    min = 'min';
+    len = 'len';
+    and = 'and';
+    or = 'or';
+    not = 'not';
+    blank = (' ' | lf | cr);
+    line_comment = '#' not_eol * eol;
+    number = digit+ | (digit+ '.' digit+);
+    identifier = letter (letter | digit)*;
+    string = '"'not_eol* '"';
+    single_string = '''not_eol* ''';
+
+Ignored Tokens
+    blank, line_comment;
+
+Productions
+    goal = command*;
+    command = {func} function | {stat} statement;
+    function = def identifier l_par argument? r_par semi statement;
+    argument = identifier def_val? another_val*;
+    def_val = assign value;
+    another_val = comma identifier def_val?;
+
+    statement = 
+            {if}tab* if comparison semi statement |                
+            {while}tab* while comparison semi statement |                
+            {for}tab* for [id1]: identifier in [id2]: identifier semi statement |               
+            {return}tab* return expression |                
+            {print}tab* print [exp1]:expression comma_expression* |                
+            {assignment}tab* assignment_statement |                
+            {assert}tab* assert [exp1]:expression comma_expression? |  
+			{import}tab* import_statement |
+            {func_call}tab* function_call;
+
+	// assignements involving '=' symbol. '+=' and '*=' not included, since they didn't exist in the bnf
+    assignment_statement = 
+                        {assign} identifier assign expression |
+                        {sub_assign} identifier sub_assign expression |
+                        {div_assign} identifier div_assign expression |
+                        {assign_arr} identifier l_br [exp1]: expression r_br assign [exp2]: expression;
+
+    expression =
+                {numerical_exp} num_exp |
+                {id_bracket_exp} identifier l_br expression r_br |
+                {func_call} function_call |
+                {len_exp} len l_par expression r_par |
+                {maxmin} maxmin l_par value comma_value* r_par |
+                {list_def} l_br [exp1]: expression comma_expression* r_br;
+
+    num_exp = first_group |
+                    {sum} num_exp plus first_group |
+                    {sub} num_exp minus first_group;
+
+    first_group = sec_group |
+                  {mult} first_group mult sec_group |
+                  {div} first_group div sec_group |
+                  {mod} first_group mod sec_group;
+                
+    sec_group = value | {exp} sec_group dmult value;
+
+    maxmin = {max} max | {min} min;
+    comma_value = comma value;
+    comma_expression = comma [exp2]:expression;
+
+	//except normal imports, covering cases like relative imports and imports with aliases
+    import_statement = {import_module_as} import module import_as? another_module* |
+                       {from_module_import} from module import identifier import_as? another_identifier*;
+    
+    module = id_dot* identifier;
+
+    import_as = as identifier;
+
+    id_dot = identifier dot;
+
+	another_module = comma module import_as?;
+
+	another_identifier = comma identifier import_as?;
+
+    // covering both 'and', 'or' and numerical comparissons
+    comparison = case1;
+    case1 = {or} case1 or case2 | {and} case2;
+    case2 = {and} case2 and case3 | case3;
+    case3 = {case3} not comp | {comp} comp;
+    comp = 
+        {great} [exp1]: expression great [exp2]: expression |
+        {less} [exp1]: expression less [exp2]: expression |
+        {leq} [exp1]: expression leq [exp2]: expression |
+	    {geq} [exp1]: expression geq [exp2]: expression |
+	    {neq} [exp1]: expression neq [exp2]: expression |
+	    {eq} [exp1]: expression eq [exp2]: expression |
+	    {true} true |
+        {false} false;
+
+    //calls for functions with arguments or void functions
+    function_call = identifier l_par arglist? r_par;
+
+    arglist = expression comma_exp*;
+
+	// any assignable value 
+    value = {id_func} identifier dot function_call |
+            {num} number |
+            {string} string |
+            {single_string} single_string |
+            {none} none |
+            {identifier} identifier |
+            {par} l_par num_exp r_par;
+            
+    comma_exp = comma expression;
+    
